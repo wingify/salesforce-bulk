@@ -139,8 +139,3 @@ if __name__ == '__main__':
     suite = unittest.TestSuite()
     suite.addTest(SalesforceBulkTest("test_csv_upload", host, sessionId))
     unittest.TextTestRunner().run(suite)
-
-
-
-
-
