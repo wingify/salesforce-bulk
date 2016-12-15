@@ -1,1 +1,1 @@
-include README.md LICENSE test_salesforce_bulk.py
+include README.md LICENSE test.py

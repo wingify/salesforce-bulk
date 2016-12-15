@@ -13,13 +13,14 @@ if sys.argv[-1] == 'publish':
     sys.exit()
 
 packages = [
-    'salesforce_bulk',
+    'salesforce_bulkipy',
 ]
 
 requires = [
     'httplib2>=0.7.5',
     'requests>=2.2.1',
     'unicodecsv>=0.13.0',
+    'simple-salesforce>=0.72.2',
 ]
 
 with open('README.md') as f:
@@ -28,13 +29,13 @@ with open('LICENSE') as f:
     license = f.read()
 
 setup(
-    name='salesforce-bulk',
-    version='1.1.0',
-    description='Python interface to the Salesforce.com Bulk API.',
+    name='salesforce-bulkipy',
+    version='1.0',
+    description='A Python library for the Salesforce Bulk API',
     long_description=readme,
-    author='Scott Persinger',
-    author_email='scottp@heroku.com',
-    url='https://github.com/heroku/salesforce-bulk',
+    author='Shreyans Sheth',
+    author_email='dev.shreyans96@gmail.com',
+    url='https://github.com/wingify/salesforce-bulkipy',
     packages=packages,
     package_data={'': ['LICENSE']},
     include_package_data=True,

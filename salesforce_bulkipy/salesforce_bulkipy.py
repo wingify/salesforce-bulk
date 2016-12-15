@@ -1,22 +1,18 @@
 from __future__ import absolute_import
-
-# Interface to the Salesforce BULK API
-import os
+from tempfile import TemporaryFile
 from collections import namedtuple
 from httplib2 import Http
+from . import bulk_states
+
+import xml.etree.ElementTree as ET
 import simple_salesforce
-import requests
-import urllib2
 import urlparse
 import requests
-import xml.etree.ElementTree as ET
-from tempfile import TemporaryFile, NamedTemporaryFile
+
 import StringIO
 import re
 import time
 import csv
-
-from . import bulk_states
 
 UploadResult = namedtuple('UploadResult', 'id success created error')
 
@@ -46,14 +42,14 @@ class BulkBatchFailed(BulkApiError):
         super(BulkBatchFailed, self).__init__(message)
 
 
-class SalesforceBulk(object):
+class SalesforceBulkipy(object):
     def __init__(self, session_id=None, host=None, username=None, password=None, security_token=None, sandbox=False,
                  exception_class=BulkApiError, API_version="29.0"):
         if (not session_id or not host) and (not username or not password or not security_token):
             raise RuntimeError(
                 "Must supply either sessionId,host or username,password,security_token")
         if username and password and security_token:
-            session_id, host = SalesforceBulk.login_to_salesforce_using_username_password(username, password,
+            session_id, host = SalesforceBulkipy.login_to_salesforce_using_username_password(username, password,
                                                                                              security_token, sandbox)
 
         if host[0:4] == 'http':
@@ -326,7 +322,7 @@ class SalesforceBulk(object):
                 "Batch id '%s' is uknown, can't retrieve job_id" % batch_id)
 
     def job_status(self, job_id=None):
-        job_id = job_id or self.lookup_job_id(batch_id)
+        job_id = job_id or self.lookup_job_id(job_id)
         uri = urlparse.urljoin(self.endpoint + "/",
                                'job/{0}'.format(job_id))
         response = requests.get(uri, headers=self.headers())

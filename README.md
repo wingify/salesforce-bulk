@@ -4,6 +4,8 @@ Python client library for accessing the asynchronous Salesforce.com Bulk API.
 
 ## Installation
 
+incase your setup fails, run `sudo apt-get install build-essential libssl-dev libffi-dev python-dev`
+
 ```pip install salesforce-bulk```
 
 ## Authentication

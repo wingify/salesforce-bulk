@@ -1,8 +1,6 @@
-1.1.0
-- Python 2.6 support thanks to VIVIDboarder: https://github.com/heroku/salesforce-bulk/pull/17
-- https://github.com/heroku/salesforce-bulk/pull/19
-- https://github.com/heroku/salesforce-bulk/pull/18
-- https://github.com/heroku/salesforce-bulk/pull/16
-1.0.8
-- Includes Upsert support
-- Allow API version to be specified by the caller
+1.0
+-Added support for 2 factor auth, routed via simple-salesforce
+-Added support for sandbox
+-Added support for unicode characters
+-Fixed keyword not found
+-Rest is simply refactored from https://github.com/heroku/salesforce-bulk
