@@ -51,13 +51,13 @@ class BulkBatchFailed(BulkApiError):
 class SalesforceBulk(object):
 
     def __init__(self, sessionId=None, host=None, username=None, password=None,
-                 exception_class=BulkApiError, API_version="29.0"):
+                 exception_class=BulkApiError, API_version="29.0", sandbox=False):
         if not sessionId and not username:
             raise RuntimeError(
                 "Must supply either sessionId/instance_url or username/password")
         if not sessionId:
             sessionId, endpoint = SalesforceBulk.login_to_salesforce(
-                username, password)
+                username, password, sandbox=sandbox)
             host = urlparse.urlparse(endpoint)
             host = host.hostname.replace("-api", "")
 
@@ -74,7 +74,7 @@ class SalesforceBulk(object):
         self.exception_class = exception_class
 
     @staticmethod
-    def login_to_salesforce(username, password):
+    def login_to_salesforce(username, password, sandbox=False):
         env_vars = (
             'SALESFORCE_CLIENT_ID',
             'SALESFORCE_CLIENT_SECRET',
@@ -93,7 +93,7 @@ class SalesforceBulk(object):
                 "You must install salesforce-oauth-request to use username/password")
 
         packet = salesforce_oauth_request.login(
-            username=username, password=password)
+            username=username, password=password, sandbox=sandbox)
         return packet['access_token'], packet['instance_url']
 
     def headers(self, values={}):
@@ -314,7 +314,7 @@ class SalesforceBulk(object):
             results.append(tf.read())
 
         flag = self.get_batch_results(
-            query_job_id, query_batch_id)
+            query_job_id, query_batch_id, callback=save_results)
 
         if job_id is None:
             job_id = self.create_job(object_type, "delete")
@@ -434,7 +434,6 @@ class SalesforceBulk(object):
         """
         Gets result ids and generates each result set from the batch and returns it
         as an generator fetching the next result set when needed
-
         Args:
             batch_id: id of batch
             job_id: id of job, if not provided, it will be looked up
