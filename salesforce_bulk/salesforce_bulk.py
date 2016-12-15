@@ -4,6 +4,7 @@ from __future__ import absolute_import
 import os
 from collections import namedtuple
 from httplib2 import Http
+import simple_salesforce
 import requests
 import urllib2
 import urlparse
@@ -21,14 +22,12 @@ UploadResult = namedtuple('UploadResult', 'id success created error')
 
 
 class BulkApiError(Exception):
-
     def __init__(self, message, status_code=None):
         super(BulkApiError, self).__init__(message)
         self.status_code = status_code
 
 
 class BulkJobAborted(BulkApiError):
-
     def __init__(self, job_id):
         self.job_id = job_id
 
@@ -37,7 +36,6 @@ class BulkJobAborted(BulkApiError):
 
 
 class BulkBatchFailed(BulkApiError):
-
     def __init__(self, job_id, batch_id, state_message):
         self.job_id = job_id
         self.batch_id = batch_id
@@ -49,24 +47,21 @@ class BulkBatchFailed(BulkApiError):
 
 
 class SalesforceBulk(object):
-
-    def __init__(self, sessionId=None, host=None, username=None, password=None,
-                 exception_class=BulkApiError, API_version="29.0", sandbox=False):
-        if not sessionId and not username:
+    def __init__(self, session_id=None, host=None, username=None, password=None, security_token=None, sandbox=False,
+                 exception_class=BulkApiError, API_version="29.0"):
+        if (not session_id or not host) and (not username or not password or not security_token):
             raise RuntimeError(
-                "Must supply either sessionId/instance_url or username/password")
-        if not sessionId:
-            sessionId, endpoint = SalesforceBulk.login_to_salesforce(
-                username, password, sandbox=sandbox)
-            host = urlparse.urlparse(endpoint)
-            host = host.hostname.replace("-api", "")
+                "Must supply either sessionId,host or username,password,security_token")
+        if username and password and security_token:
+            session_id, host = SalesforceBulk.login_to_salesforce_using_username_password(username, password,
+                                                                                             security_token, sandbox)
 
         if host[0:4] == 'http':
             self.endpoint = host
         else:
             self.endpoint = "https://" + host
         self.endpoint += "/services/async/%s" % API_version
-        self.sessionId = sessionId
+        self.sessionId = session_id
         self.jobNS = 'http://www.force.com/2009/06/asyncapi/dataload'
         self.jobs = {}  # dict of job_id => job_id
         self.batches = {}  # dict of batch_id => job_id
@@ -74,27 +69,10 @@ class SalesforceBulk(object):
         self.exception_class = exception_class
 
     @staticmethod
-    def login_to_salesforce(username, password, sandbox=False):
-        env_vars = (
-            'SALESFORCE_CLIENT_ID',
-            'SALESFORCE_CLIENT_SECRET',
-            'SALESFORCE_REDIRECT_URI',
-        )
-        missing_env_vars = [e for e in env_vars if e not in os.environ]
-        if missing_env_vars:
-            raise RuntimeError(
-                "You must set {0} to use username/pass login".format(
-                    ', '.join(missing_env_vars)))
-
-        try:
-            import salesforce_oauth_request
-        except ImportError:
-            raise ImportError(
-                "You must install salesforce-oauth-request to use username/password")
-
-        packet = salesforce_oauth_request.login(
-            username=username, password=password, sandbox=sandbox)
-        return packet['access_token'], packet['instance_url']
+    def login_to_salesforce_using_username_password(username, password, security_token, sandbox):
+        sf = simple_salesforce.Salesforce(username=username, password=password, security_token=security_token,
+                                          sandbox=sandbox)
+        return sf.session_id, sf.sf_instance
 
     def headers(self, values={}):
         default = {"X-SFDC-Session": self.sessionId,
@@ -121,8 +99,8 @@ class SalesforceBulk(object):
 
     def create_job(self, object_name=None, operation=None, contentType='CSV',
                    concurrency=None, external_id_name=None):
-        assert(object_name is not None)
-        assert(operation is not None)
+        assert (object_name is not None)
+        assert (operation is not None)
 
         doc = self.create_job_doc(object_name=object_name,
                                   operation=operation,
@@ -349,8 +327,8 @@ class SalesforceBulk(object):
 
     def job_status(self, job_id=None):
         job_id = job_id or self.lookup_job_id(batch_id)
-        uri = urlparse.urljoin(self.endpoint +"/",
-            'job/{0}'.format(job_id))
+        uri = urlparse.urljoin(self.endpoint + "/",
+                               'job/{0}'.format(job_id))
         response = requests.get(uri, headers=self.headers())
         if response.status_code != 200:
             self.raise_error(response.content, response.status_code)
@@ -376,7 +354,7 @@ class SalesforceBulk(object):
 
         http = Http()
         uri = self.endpoint + \
-            "/job/%s/batch/%s" % (job_id, batch_id)
+              "/job/%s/batch/%s" % (job_id, batch_id)
         resp, content = http.request(uri, headers=self.headers())
         self.check_status(resp, content)
 
@@ -498,13 +476,13 @@ class SalesforceBulk(object):
                            (batch_id, failed))
 
         uri = self.endpoint + \
-            "/job/%s/batch/%s/result" % (job_id, batch_id)
+              "/job/%s/batch/%s/result" % (job_id, batch_id)
         r = requests.get(uri, headers=self.headers(), stream=True)
 
         result_id = r.text.split("<result>")[1].split("</result>")[0]
 
         uri = self.endpoint + \
-            "/job/%s/batch/%s/result/%s" % (job_id, batch_id, result_id)
+              "/job/%s/batch/%s/result/%s" % (job_id, batch_id, result_id)
         r = requests.get(uri, headers=self.headers(), stream=True)
 
         if parse_csv:
@@ -522,7 +500,7 @@ class SalesforceBulk(object):
             return False
         http = Http()
         uri = self.endpoint + \
-            "/job/%s/batch/%s/result" % (job_id, batch_id)
+              "/job/%s/batch/%s/result" % (job_id, batch_id)
         resp, content = http.request(uri, method="GET", headers=self.headers())
 
         tf = TemporaryFile()
