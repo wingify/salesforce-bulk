@@ -9,6 +9,7 @@ The [salesforce-bulk](https://github.com/heroku/salesforce-bulk) library was use
 * Added support for [Two-Factor Authentication](https://developer.salesforce.com/docs/atlas.en-us.identityImplGuide.meta/identityImplGuide/security_require_two-factor_authentication.htm) by routing authentication via [simple-salesforce](https://github.com/simple-salesforce/simple-salesforce)
 * Added support for [Salesforce Sandbox](https://test.salesforce.com)
 * Added support for parsing unicode characters in CSV
+* Explicit [Upsert](https://developer.salesforce.com/docs/atlas.en-us.api.meta/api/sforce_api_calls_upsert.htm) Support
 * Fixed various other bugs
 
 **salesforce-bulkipy** will be actively maintained, unlike salesforce-bulk
@@ -69,11 +70,19 @@ The basic sequence for driving the Bulk API is:
 3. Wait for each batch to finish
 4. Close the job
 
-## Bulk Insert, Update, Delete
+## Bulk Insert, Update, Upsert, Delete
 
 All Bulk upload operations work the same. You set the operation when you create the
 job. Then you submit one or more documents that specify records with columns to
-insert/update/delete. When deleting you should only submit the Id for each record.
+*insert*/*update*/*delete*.
+
+For the *upsert* operation, we also need to specify
+ some thing called the *external_key* which can be any attribute(preferably unique) of your custom Salesforce object. Every record to upsert is checked against
+ this key in Salesforce. Say your external key is *Id*. Now for every record you
+  are pushing, it is checked it you have a record with the same *Id* already. If yes,
+  then it is updated else that record is created.
+
+ For the *delete* operation, you should only submit the Id for each record.
 
 For efficiency you should use the `post_bulk_batch` method to post each batch of
 data. (Note that a batch can have a maximum 10,000 records and be 1GB in size.)
@@ -117,12 +126,30 @@ records_to_insert = [{}, {}]  # A list of A Custom Object dict
 
 # Bulk Query
 query = '' # SOQL Query
-job = bulk.create_query_job("PushCrew_Account__c", contentType='CSV')
+job = bulk.create_query_job("Object_Name", contentType='CSV')
 batch = bulk.query(job, query)
 bulk.wait_for_batch(job, batch)
 bulk.close_job(job)
 # Result
 results = bulk.get_batch_result_iter(job, batch, parse_csv=True)
+```
+
+## Bulk Upsert Example
+
+```
+from salesforce_bulkipy import SalesforceBulkipy
+
+bulk = SalesforceBulkipy(username=username, password=password, security_token=security_token)
+
+records_to_upsert = [{}, {}]  # A list of A Custom Object dict
+
+# Bulk Query
+query = '' # SOQL Query
+job = bulk.create_upsert_job("Object_Name", external_id_name="Unique_id", contentType='CSV')
+csv_iter = CsvDictsAdapter(iter(records_to_insert))
+batch = bulk.post_bulk_batch(job, csv_iter)
+bulk.wait_for_batch(job, batch)
+bulk.close_job(job)
 ```
 
 ## Credits and Contributions
