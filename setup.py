@@ -23,8 +23,13 @@ requires = [
     'simple-salesforce>=0.72.2',
 ]
 
-with open('README.md') as f:
-    readme = f.read()
+try:
+    import pypandoc
+    readme = pypandoc.convert('README.md', 'rst')
+except Exception as e:
+    print 'ERROR', e.message
+    readme = open('README.md').read()
+
 with open('LICENSE') as f:
     license = f.read()
 
