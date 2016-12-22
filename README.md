@@ -122,8 +122,6 @@ from salesforce_bulkipy import SalesforceBulkipy
 
 bulk = SalesforceBulkipy(username=username, password=password, security_token=security_token)
 
-records_to_insert = [{}, {}]  # A list of A Custom Object dict
-
 # Bulk Query
 query = '' # SOQL Query
 job = bulk.create_query_job("Object_Name", contentType='CSV')
@@ -143,7 +141,7 @@ bulk = SalesforceBulkipy(username=username, password=password, security_token=se
 
 records_to_upsert = [{}, {}]  # A list of A Custom Object dict
 
-# Bulk Query
+# Bulk Upsert
 query = '' # SOQL Query
 job = bulk.create_upsert_job("Object_Name", external_id_name="Unique_id", contentType='CSV')
 csv_iter = CsvDictsAdapter(iter(records_to_insert))
