@@ -4,7 +4,7 @@ A Python library for the Salesforce Bulk API (that actually works)
 
 ## Changes over [salesforce-bulk](https://github.com/heroku/salesforce-bulk)
 
-The [salesforce-bulk](https://github.com/heroku/salesforce-bulk) library was used to export 18k records to [Wingify](https://github.com/wingify)'s Salesforce system. Even though the library was super useful, it's broken, not maintained anymore and was a pain to work with while figuring out the bugs. [@bholagabbar](https://github.com/bholagabbar) decided to fix all the issues faced and release a new, usable library [**salesforce-bulkipy**](https://pypi.python.org/pypi/salesforce-bulkipy/1.0). This library has been tested successfully on our Salesforce Sandbox.
+The [salesforce-bulk](https://github.com/heroku/salesforce-bulk) library was used to export 18k records to [Wingify](https://github.com/wingify)'s Salesforce system. Even though the library was super useful, it's broken, not maintained anymore and was a pain to work with while figuring out the bugs. [@bholagabbar](https://github.com/bholagabbar) decided to fix all the issues faced and release a new, usable library [**salesforce-bulkipy**](https://pypi.python.org/pypi/salesforce-bulkipy/1.0). This library is currently being used in our production systems and has been extensively tested on our Salesforce sandbox as well.
 
 * Added support for [Two-Factor Authentication](https://developer.salesforce.com/docs/atlas.en-us.identityImplGuide.meta/identityImplGuide/security_require_two-factor_authentication.htm) by routing authentication via [simple-salesforce](https://github.com/simple-salesforce/simple-salesforce)
 * Added support for [Salesforce Sandbox](https://test.salesforce.com)
