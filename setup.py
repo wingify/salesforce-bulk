@@ -21,6 +21,7 @@ requires = [
     'requests>=2.2.1',
     'unicodecsv>=0.13.0',
     'simple-salesforce>=0.72.2',
+    'future==0.16'
 ]
 
 try:
@@ -55,5 +56,6 @@ setup(
         'Programming Language :: Python',
         'Programming Language :: Python :: 2.6',
         'Programming Language :: Python :: 2.7',
+        'Programming Language :: Python :: 3',
     ),
 )
