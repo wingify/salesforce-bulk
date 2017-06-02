@@ -1,15 +1,19 @@
 from __future__ import absolute_import
+from future.standard_library import install_aliases
+from future.utils import iteritems
+install_aliases()
+
 from tempfile import TemporaryFile
 from collections import namedtuple
 from httplib2 import Http
+from urllib.parse import urlparse
 from . import bulk_states
 
 import xml.etree.ElementTree as ET
 import simple_salesforce
-import urlparse
 import requests
 
-import StringIO
+from io import StringIO
 import re
 import time
 import csv
@@ -73,7 +77,7 @@ class SalesforceBulkipy(object):
     def headers(self, values={}):
         default = {"X-SFDC-Session": self.sessionId,
                    "Content-Type": "application/xml; charset=UTF-8"}
-        for k, val in values.iteritems():
+        for k, val in iteritems(values):
             default[k] = val
         return default
 
