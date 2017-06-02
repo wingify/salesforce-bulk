@@ -11,6 +11,7 @@ The [salesforce-bulk](https://github.com/heroku/salesforce-bulk) library was use
 * Added support for parsing unicode characters in CSV
 * Explicit [Upsert](https://developer.salesforce.com/docs/atlas.en-us.api.meta/api/sforce_api_calls_upsert.htm) Support
 * Fixed various other bugs
+* Python 3 support
 
 **salesforce-bulkipy** will be actively maintained, unlike salesforce-bulk
 
@@ -152,6 +153,6 @@ bulk.close_job(job)
 
 ## Credits and Contributions
 
-This repository is a maintained fork of [heroku/salesforce-bulk](https://github.com/heroku/salesforce-bulk). The changes incorporated here are a result of a joint effort by [@lambacck](https://github.com/lambacck), [@Jeremydavisvt](https://github.com/Jeremydavisvt), [@alexhughson](https://github.com/alexhughson) and [@bholagabbar](https://github.com/bholagabbar). Thanks to [@heroku](https://github.com/heroku) for creating the original useful library.
+This repository is a maintained fork of [heroku/salesforce-bulk](https://github.com/heroku/salesforce-bulk). The changes incorporated here are a result of a joint effort by [@lambacck](https://github.com/lambacck), [@Jeremydavisvt](https://github.com/Jeremydavisvt), [@alexhughson](https://github.com/alexhughson), [@bholagabbar](https://github.com/bholagabbar) and [@TrustYou](https://github.com/trustyou) ([@xyder](https://github.com/xyder) and [@jeryini](https://github.com/jeryini)). Thanks to [@heroku](https://github.com/heroku) for creating the original useful library.
 
 Feel free to contribute by creating Issues and Pull Requests. We'll test and merge them.
