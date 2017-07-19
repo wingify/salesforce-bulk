@@ -1,5 +1,6 @@
 #!/usr/bin/env python
 
+from __future__ import print_function
 import os
 import sys
 
@@ -21,13 +22,14 @@ requires = [
     'requests>=2.2.1',
     'unicodecsv>=0.13.0',
     'simple-salesforce>=0.72.2',
+    'future==0.16',
 ]
 
 try:
     import pypandoc
     readme = pypandoc.convert('README.md', 'rst')
 except Exception as e:
-    print 'ERROR', e.message
+    print('ERROR', getattr(e, 'message', e))
     readme = open('README.md').read()
 
 with open('LICENSE') as f:
@@ -55,5 +57,6 @@ setup(
         'Programming Language :: Python',
         'Programming Language :: Python :: 2.6',
         'Programming Language :: Python :: 2.7',
+        'Programming Language :: Python :: 3',
     ),
 )

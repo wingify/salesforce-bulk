@@ -1,18 +1,32 @@
 from __future__ import absolute_import
-from tempfile import TemporaryFile
-from collections import namedtuple
-from httplib2 import Http
-from . import bulk_states
+from future.standard_library import install_aliases
+from future.utils import iteritems
+install_aliases()
 
-import xml.etree.ElementTree as ET
-import simple_salesforce
-import urlparse
-import requests
-
-import StringIO
+import sys
 import re
 import time
 import csv
+from io import BytesIO
+from tempfile import TemporaryFile
+from collections import namedtuple
+import xml.etree.ElementTree as ET
+
+try:
+    from StringIO import StringIO
+except ImportError:
+    from io import StringIO
+
+try:
+    # Python 2
+    import urlparse
+except ImportError:
+    import urllib.parse as urlparse
+from . import bulk_states
+
+import simple_salesforce
+import requests
+
 
 UploadResult = namedtuple('UploadResult', 'id success created error')
 
@@ -73,7 +87,7 @@ class SalesforceBulkipy(object):
     def headers(self, values={}):
         default = {"X-SFDC-Session": self.sessionId,
                    "Content-Type": "application/xml; charset=UTF-8"}
-        for k, val in values.iteritems():
+        for k, val in iteritems(values):
             default[k] = val
         return default
 
@@ -103,46 +117,36 @@ class SalesforceBulkipy(object):
                                   contentType=contentType,
                                   concurrency=concurrency,
                                   external_id_name=external_id_name)
+        url = self.endpoint + '/job'
 
-        http = Http()
-        resp, content = http.request(self.endpoint + "/job",
-                                     "POST",
-                                     headers=self.headers(),
-                                     body=doc)
+        resp = requests.post(url, headers=self.headers(), data=doc)
+        self.check_status(resp, resp.content)
 
-        self.check_status(resp, content)
-
-        tree = ET.fromstring(content)
+        tree = ET.fromstring(resp.content)
         job_id = tree.findtext("{%s}id" % self.jobNS)
         self.jobs[job_id] = job_id
 
         return job_id
 
     def check_status(self, resp, content):
-        if resp.status >= 400:
+        if resp.status_code >= 400:
             msg = "Bulk API HTTP Error result: {0}".format(content)
-            self.raise_error(msg, resp.status)
+            self.raise_error(msg, resp.status_code)
 
     def close_job(self, job_id):
         doc = self.create_close_job_doc()
-        http = Http()
         url = self.endpoint + "/job/%s" % job_id
-        resp, content = http.request(url, "POST", headers=self.headers(),
-                                     body=doc)
-        self.check_status(resp, content)
+
+        resp = requests.post(url, headers=self.headers(), data=doc)
+        self.check_status(resp, resp.content)
 
     def abort_job(self, job_id):
         """Abort a given bulk job"""
         doc = self.create_abort_job_doc()
-        http = Http()
         url = self.endpoint + "/job/%s" % job_id
-        resp, content = http.request(
-            url,
-            "POST",
-            headers=self.headers(),
-            body=doc
-        )
-        self.check_status(resp, content)
+
+        resp = requests.post(url, headers=self.headers(), data=doc)
+        self.check_status(resp, resp.content)
 
     def create_job_doc(self, object_name=None, operation=None,
                        contentType='CSV', concurrency=None, external_id_name=None):
@@ -162,10 +166,7 @@ class SalesforceBulkipy(object):
         ct = ET.SubElement(root, "contentType")
         ct.text = contentType
 
-        buf = StringIO.StringIO()
-        tree = ET.ElementTree(root)
-        tree.write(buf, encoding="UTF-8")
-        return buf.getvalue()
+        return self._xml_element_to_str(root)
 
     def create_close_job_doc(self):
         root = ET.Element("jobInfo")
@@ -173,10 +174,7 @@ class SalesforceBulkipy(object):
         state = ET.SubElement(root, "state")
         state.text = "Closed"
 
-        buf = StringIO.StringIO()
-        tree = ET.ElementTree(root)
-        tree.write(buf, encoding="UTF-8")
-        return buf.getvalue()
+        return self._xml_element_to_str(root)
 
     def create_abort_job_doc(self):
         """Create XML doc for aborting a job"""
@@ -185,10 +183,7 @@ class SalesforceBulkipy(object):
         state = ET.SubElement(root, "state")
         state.text = "Aborted"
 
-        buf = StringIO.StringIO()
-        tree = ET.ElementTree(root)
-        tree.write(buf, encoding="UTF-8")
-        return buf.getvalue()
+        return self._xml_element_to_str(root)
 
     # Add a BulkQuery to the job - returns the batch id
     def query(self, job_id, soql):
@@ -196,15 +191,14 @@ class SalesforceBulkipy(object):
             job_id = self.create_job(
                 re.search(re.compile("from (\w+)", re.I), soql).group(1),
                 "query")
-        http = Http()
+
         uri = self.endpoint + "/job/%s/batch" % job_id
         headers = self.headers({"Content-Type": "text/csv"})
-        resp, content = http.request(uri, method="POST", body=soql,
-                                     headers=headers)
 
-        self.check_status(resp, content)
+        resp = requests.post(uri, headers=headers, data=soql)
+        self.check_status(resp, resp.content)
 
-        tree = ET.fromstring(content)
+        tree = ET.fromstring(resp.content)
         batch_id = tree.findtext("{%s}id" % self.jobNS)
 
         self.batches[batch_id] = job_id
@@ -212,8 +206,10 @@ class SalesforceBulkipy(object):
         return batch_id
 
     def split_csv(self, csv, batch_size):
-        csv_io = StringIO.StringIO(csv)
+        csv_io = StringIO(csv)
         batches = []
+        batch = ''
+        headers = ''
 
         for i, line in enumerate(csv_io):
             if not i:
@@ -282,29 +278,21 @@ class SalesforceBulkipy(object):
         query_batch_id = self.query(query_job_id, soql)
         self.wait_for_batch(query_job_id, query_batch_id, timeout=120)
 
-        results = []
-
-        def save_results(tf, **kwargs):
-            results.append(tf.read())
-
-        flag = self.get_batch_results(
-            query_job_id, query_batch_id, callback=save_results)
-
+        results = self.get_all_results_for_batch(batch_id=query_batch_id, job_id=query_job_id)
         if job_id is None:
-            job_id = self.create_job(object_type, "delete")
-        http = Http()
-        # Split a large CSV into manageable batches
-        batches = self.split_csv(csv, batch_size)
+            job_id = self.create_delete_job(object_type)
+
         batch_ids = []
 
         uri = self.endpoint + "/job/%s/batch" % job_id
         headers = self.headers({"Content-Type": "text/csv"})
         for batch in results:
-            resp = requests.post(uri, data=batch, headers=headers)
+            batch_data = '\n'.join(list(batch))
+            resp = requests.post(uri, data=batch_data, headers=headers)
             content = resp.content
 
             if resp.status_code >= 400:
-                self.raise_error(content, resp.status)
+                self.raise_error(content, resp.status_code)
 
             tree = ET.fromstring(content)
             batch_id = tree.findtext("{%s}id" % self.jobNS)
@@ -312,6 +300,7 @@ class SalesforceBulkipy(object):
             self.batches[batch_id] = job_id
             batch_ids.append(batch_id)
 
+        self.close_job(query_job_id)
         return batch_ids
 
     def lookup_job_id(self, batch_id):
@@ -347,14 +336,13 @@ class SalesforceBulkipy(object):
             return self.batch_statuses[batch_id]
 
         job_id = job_id or self.lookup_job_id(batch_id)
-
-        http = Http()
         uri = self.endpoint + \
               "/job/%s/batch/%s" % (job_id, batch_id)
-        resp, content = http.request(uri, headers=self.headers())
-        self.check_status(resp, content)
 
-        tree = ET.fromstring(content)
+        resp = requests.get(uri, headers=self.headers())
+        self.check_status(resp, resp.content)
+
+        tree = ET.fromstring(resp.content)
         result = {}
         for child in tree:
             result[re.sub("{.*?}", "", child.tag)] = child.text
@@ -439,17 +427,20 @@ class SalesforceBulkipy(object):
         logger('Downloading bulk result file id=#{0}'.format(result_id))
         resp = requests.get(uri, headers=self.headers(), stream=True)
 
-        if not parse_csv:
-            iterator = resp.iter_lines()
+        if parse_csv:
+            iterator = csv.reader(
+                self._unicode_list_gen(resp.iter_lines()), delimiter=',', quotechar='"')
         else:
-            iterator = csv.reader(resp.iter_lines(), delimiter=',',
-                                  quotechar='"')
+            iterator = self._unicode_list_gen(resp.iter_lines())
 
         BATCH_SIZE = 5000
         for i, line in enumerate(iterator):
             if i % BATCH_SIZE == 0:
                 logger('Loading bulk result #{0}'.format(i))
-            yield line
+            if parse_csv:
+                yield list(self._unicode_list_gen(line))
+            else:
+                yield self._unicode_converter(line)
 
     def get_batch_result_iter(self, job_id, batch_id, parse_csv=False,
                               logger=None):
@@ -482,10 +473,13 @@ class SalesforceBulkipy(object):
         r = requests.get(uri, headers=self.headers(), stream=True)
 
         if parse_csv:
-            return csv.DictReader(r.iter_lines(chunk_size=2048), delimiter=",",
-                                  quotechar='"')
+            reader = csv.DictReader(
+                self._unicode_list_gen(r.iter_lines(chunk_size=2048)),
+                delimiter=',',
+                quotechar='"')
+            return self._unicode_list_dicts_gen(reader)
         else:
-            return r.iter_lines(chunk_size=2048)
+            return self._unicode_list_gen(r.iter_lines(chunk_size=2048))
 
     def get_upload_results(self, job_id, batch_id,
                            callback=(lambda *args, **kwargs: None),
@@ -494,13 +488,13 @@ class SalesforceBulkipy(object):
 
         if not self.is_batch_done(job_id, batch_id):
             return False
-        http = Http()
+
         uri = self.endpoint + \
               "/job/%s/batch/%s/result" % (job_id, batch_id)
-        resp, content = http.request(uri, method="GET", headers=self.headers())
+        resp = requests.get(uri, headers=self.headers())
 
         tf = TemporaryFile()
-        tf.write(content)
+        tf.write(resp.content)
 
         total_remaining = self.count_file_lines(tf)
         if logger:
@@ -510,7 +504,9 @@ class SalesforceBulkipy(object):
         records = []
         line_number = 0
         col_names = []
-        reader = csv.reader(tf, delimiter=",", quotechar='"')
+        tf_text = tf.read()
+        reader = csv.reader(
+            self._unicode_list_gen(tf_text.splitlines()), delimiter=",", quotechar='"')
         for row in reader:
             line_number += 1
             records.append(UploadResult(*row))
@@ -560,3 +556,70 @@ class SalesforceBulkipy(object):
                         quotes = 0
 
         return lines
+
+    @staticmethod
+    def _xml_element_to_str(root):
+        """ Converts a xml.etree.ElementTree.Element to string
+
+        Args:
+            root (xml.etree.ElementTree.Element): the tree element
+
+        Returns:
+            The string representation of the given element
+        """
+
+        buf = BytesIO()
+        tree = ET.ElementTree(root)
+        tree.write(buf, encoding="UTF-8", xml_declaration=True)
+        return buf.getvalue().decode('utf-8')
+
+    @staticmethod
+    def _unicode_converter(input_data):
+        """ Converts a string/byte array to a unicode string in Py 2 and Py 3
+        Args:
+            input_data (str|unicode|bytes): the array to be converted
+
+        Returns:
+            a unicode string
+        """
+
+        if sys.version_info[0] == 2:
+            # py2
+            if isinstance(input_data, unicode):
+                return input_data
+            else:
+                return str(input_data)
+        else:
+            # py3
+            try:
+                return input_data.decode('utf-8')
+            except AttributeError:
+                return input_data
+
+    @classmethod
+    def _unicode_list_gen(cls, input_list):
+        """ Converts a list of str or bytes to an iterable of converted unicode str
+
+        Args:
+            input_list: the list of str or bytes
+
+        Returns:
+            an iterable of converted unicode str
+        """
+
+        return (cls._unicode_converter(x) for x in input_list)
+
+    @classmethod
+    def _unicode_list_dicts_gen(cls, input_list):
+        """ Converts a list of dicts with keys/values as str/bytes to unicode str
+
+        Args:
+            input_list: a list of dicts
+
+        Returns:
+            a list of dicts having the keys/values converted to unicode strings
+        """
+
+        return ({
+            cls._unicode_converter(key): cls._unicode_converter(val)
+            for key, val in item_dict.items()} for item_dict in input_list)
